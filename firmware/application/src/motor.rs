@@ -48,20 +48,20 @@ impl Motor {
         self.speed = speed;
     }
 
-    pub fn step(&mut self, steps: i8) {
+    pub fn step(&mut self, steps: i16) {
         let delay: u64 = 60 * 1000 * 1000 / steps.abs() as u64 / self.speed as u64;
         if steps > 0 {
             for step in 0..steps {
-                self.do_step(step as u8, delay);
+                self.do_step(step as u16, delay);
             }
         } else if steps < 0 {
             for step in (0..steps.abs()).rev() {
-                self.do_step(step as u8, delay);
+                self.do_step(step as u16, delay);
             }
         }
     }
 
-    fn do_step(&mut self, step: u8, delay: u64) {
+    fn do_step(&mut self, step: u16, delay: u64) {
         let step = step % 4;
         if step == 0 {
             self.ain1.set_high();

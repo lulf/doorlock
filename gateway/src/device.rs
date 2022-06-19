@@ -36,8 +36,9 @@ impl LockDevice {
         self.write_char(LOCK_SERVICE_UUID, SPEED_CHAR_UUID, &data[..]).await
     }
 
-    pub async fn set_step(&mut self, step: u8) -> anyhow::Result<()> {
-        self.write_char(LOCK_SERVICE_UUID, STEP_CHAR_UUID, &[step]).await
+    pub async fn set_step(&mut self, step: u16) -> anyhow::Result<()> {
+        let data = step.to_le_bytes();
+        self.write_char(LOCK_SERVICE_UUID, STEP_CHAR_UUID, &data[..]).await
     }
 
     #[allow(dead_code)]

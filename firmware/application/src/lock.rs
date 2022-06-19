@@ -4,7 +4,7 @@ use crate::motor::Motor;
 
 pub struct Lock {
     motor: Motor,
-    steps: u8,
+    steps: u16,
 }
 
 impl Lock {
@@ -14,17 +14,17 @@ impl Lock {
 
     fn lock(&mut self) {
         self.motor.enable();
-        self.motor.step(self.steps as i8);
+        self.motor.step(self.steps as i16);
         self.motor.disable();
     }
 
     fn unlock(&mut self) {
         self.motor.enable();
-        self.motor.step(self.steps as i8 * -1);
+        self.motor.step(self.steps as i16 * -1);
         self.motor.disable();
     }
 
-    fn set_steps(&mut self, steps: u8) {
+    fn set_steps(&mut self, steps: u16) {
         self.steps = steps % 127;
     }
 
@@ -37,7 +37,7 @@ pub enum LockCommand {
     Lock,
     Unlock,
     SetSpeed(u32),
-    SetSteps(u8),
+    SetSteps(u16),
 }
 
 #[embassy::task]

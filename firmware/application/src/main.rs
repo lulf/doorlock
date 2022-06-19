@@ -119,7 +119,7 @@ pub struct LockService {
     speed: u32,
 
     #[characteristic(uuid = "00002003-b0cd-11ec-871f-d45ddf138840", write, read)]
-    steps: u8,
+    steps: u16,
 }
 
 #[embassy::task]

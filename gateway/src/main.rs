@@ -25,7 +25,7 @@ struct Args {
 pub enum Command {
     SetStep {
         #[clap(long)]
-        step: u8,
+        step: u16,
     },
     SetSpeed {
         #[clap(long)]
