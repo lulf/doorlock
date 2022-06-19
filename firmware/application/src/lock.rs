@@ -25,7 +25,7 @@ impl Lock {
     }
 
     fn set_steps(&mut self, steps: u16) {
-        self.steps = steps % 127;
+        self.steps = steps % (i16::MAX as u16);
     }
 
     fn set_speed(&mut self, speed: u32) {
