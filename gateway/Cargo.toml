@@ -1,0 +1,35 @@
+[package]
+name = "doorlock-gateway"
+version = "0.1.0"
+authors = ["Ulf Lilleengen <lulf@redhat.com>"]
+edition = "2021"
+license = "Apache-2.0"
+description = "A gateway for communicating with a doorlock"
+repository = "https://github.com/lulf/doorlock"
+keywords = ["IoT", "DFU", "Firmware", "BLE", "OTA"]
+readme = "README.md"
+
+[[bin]]
+name = "doorlock-gateway"
+path = "src/main.rs"
+
+[dependencies]
+
+uuid = { version = "0.8", features = ["v4"] }
+clap = { version = "3", features = ["derive"] }
+reqwest = { version = "0.11", features = ["json"] }
+async-trait = "0.1"
+tokio = { version = "1", features = ["full"] }
+log = "0.4.11"
+chrono = "0.4"
+bytes = "1.1"
+serde_json = "1"
+serde_cbor = "0.11"
+btleplug = { version = "0.9", features = ["serde"] }
+
+serde = { version = "1", features = ["derive"] }
+stderrlog = "0.4"
+futures = "0.3"
+anyhow = "1.0"
+humantime = "2"
+postcard = "0.7"

@@ -8,9 +8,7 @@ mod lock;
 mod motor;
 
 use drogue_device::bsp::boards::nrf52::adafruit_feather_nrf52840::*;
-use drogue_device::drivers::ble::gatt::dfu::{
-    FirmwareGattService, FirmwareService, FirmwareServiceEvent,
-};
+use drogue_device::drivers::ble::gatt::dfu::{FirmwareGattService, FirmwareService, FirmwareServiceEvent};
 use drogue_device::firmware::FirmwareManager;
 use drogue_device::Board;
 use embassy::blocking_mutex::raw::ThreadModeRawMutex;
@@ -68,14 +66,9 @@ async fn main(s: Spawner, p: Peripherals) {
 
     //// Fiwmare update service event channel and task
     static EVENTS: Channel<ThreadModeRawMutex, FirmwareServiceEvent, 10> = Channel::new();
-    let dfu = FirmwareManager::new(
-        Flash::take(sd),
-        FirmwareUpdater::default(),
-        version.as_bytes(),
-    );
+    let dfu = FirmwareManager::new(Flash::take(sd), FirmwareUpdater::default(), version.as_bytes());
     let updater = FirmwareGattService::new(&server.firmware, dfu, version.as_bytes(), 32).unwrap();
-    s.spawn(updater_task(updater, EVENTS.receiver().into()))
-        .unwrap();
+    s.spawn(updater_task(updater, EVENTS.receiver().into())).unwrap();
 
     // Lock control
     static COMMANDS: Channel<ThreadModeRawMutex, LockCommand, 4> = Channel::new();
@@ -89,8 +82,7 @@ async fn main(s: Spawner, p: Peripherals) {
 
     let lock = Lock::new(m);
 
-    s.spawn(lock_task(lock, COMMANDS.receiver().into()))
-        .unwrap();
+    s.spawn(lock_task(lock, COMMANDS.receiver().into())).unwrap();
 
     // Starts the bluetooth advertisement and GATT server
     s.spawn(advertiser_task(
@@ -204,20 +196,12 @@ pub async fn advertiser_task(
             scan_data,
         };
         defmt::debug!("Advertising");
-        let conn = peripheral::advertise_connectable(sd, adv, &config)
-            .await
-            .unwrap();
+        let conn = peripheral::advertise_connectable(sd, adv, &config).await.unwrap();
 
         defmt::debug!("connection established");
-        if let Err(e) = spawner.spawn(gatt_server_task(
-            conn,
-            server,
-            events.clone(),
-            commands.clone(),
-        )) {
+        if let Err(e) = spawner.spawn(gatt_server_task(conn, server, events.clone(), commands.clone())) {
             defmt::warn!("Error spawning gatt task: {:?}", e);
         }
-        commands.send(LockCommand::Lock).await;
     }
 }
 
@@ -249,9 +233,7 @@ pub fn enable_softdevice(name: &'static str) -> &'static Softdevice {
             event_length: 24,
         }),
         conn_gatt: Some(raw::ble_gatt_conn_cfg_t { att_mtu: 128 }),
-        gatts_attr_tab_size: Some(raw::ble_gatts_cfg_attr_tab_size_t {
-            attr_tab_size: 32768,
-        }),
+        gatts_attr_tab_size: Some(raw::ble_gatts_cfg_attr_tab_size_t { attr_tab_size: 32768 }),
         gap_role_count: Some(raw::ble_gap_cfg_role_count_t {
             adv_set_count: 1,
             periph_role_count: 3,
@@ -264,9 +246,7 @@ pub fn enable_softdevice(name: &'static str) -> &'static Softdevice {
             current_len: name.len() as u16,
             max_len: name.len() as u16,
             write_perm: unsafe { core::mem::zeroed() },
-            _bitfield_1: raw::ble_gap_cfg_device_name_t::new_bitfield_1(
-                raw::BLE_GATTS_VLOC_STACK as u8,
-            ),
+            _bitfield_1: raw::ble_gap_cfg_device_name_t::new_bitfield_1(raw::BLE_GATTS_VLOC_STACK as u8),
         }),
         ..Default::default()
     };
