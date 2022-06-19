@@ -24,7 +24,7 @@ impl Motor {
             bin1,
             bin2,
             standby,
-            delay: 100_000,
+            delay: 1500,
         }
     }
 
