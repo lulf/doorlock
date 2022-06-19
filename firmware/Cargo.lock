@@ -598,6 +598,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "doorlock-bootloader"
+version = "0.1.0"
+dependencies = [
+ "cfg-if",
+ "cortex-m 0.7.5",
+ "cortex-m-rt",
+ "defmt",
+ "defmt-rtt",
+ "embassy",
+ "embassy-boot",
+ "embassy-boot-nrf",
+ "embassy-nrf",
+ "embedded-storage",
+ "embedded-storage-async",
+ "nrf-softdevice-mbr",
+]
+
+[[package]]
 name = "drogue-device"
 version = "0.1.0"
 source = "git+https://github.com/drogue-iot/drogue-device.git?rev=a1a683d3c59264b04f3adf472ec2d01a910dcc70#a1a683d3c59264b04f3adf472ec2d01a910dcc70"
@@ -1886,24 +1904,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d82e1a7758622a465f8cee077614c73484dac5b836c02ff6a40d5d1010324d7"
 dependencies = [
  "serde",
-]
-
-[[package]]
-name = "trainbot-bootloader"
-version = "0.1.0"
-dependencies = [
- "cfg-if",
- "cortex-m 0.7.5",
- "cortex-m-rt",
- "defmt",
- "defmt-rtt",
- "embassy",
- "embassy-boot",
- "embassy-boot-nrf",
- "embassy-nrf",
- "embedded-storage",
- "embedded-storage-async",
- "nrf-softdevice-mbr",
 ]
 
 [[package]]

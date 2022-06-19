@@ -3,9 +3,9 @@ authors = [
     "Ulf Lilleengen <lulf@redhat.com>",
 ]
 edition = "2018"
-name = "trainbot-bootloader"
+name = "doorlock-bootloader"
 version = "0.1.0"
-description = "Bootloader for trainbot"
+description = "Bootloader for doorlock"
 resolver = "2"
 
 [dependencies]

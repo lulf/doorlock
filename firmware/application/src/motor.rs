@@ -7,7 +7,7 @@ pub struct Motor {
     bin1: Output<'static, AnyPin>,
     bin2: Output<'static, AnyPin>,
     standby: Output<'static, AnyPin>,
-    speed: u8,
+    speed: u32,
 }
 
 impl Motor {
@@ -24,7 +24,7 @@ impl Motor {
             bin1,
             bin2,
             standby,
-            speed: 10,
+            speed: 200,
         }
     }
 
@@ -44,7 +44,7 @@ impl Motor {
         self.bin2.set_low();
     }
 
-    pub fn set_speed(&mut self, speed: u8) {
+    pub fn set_speed(&mut self, speed: u32) {
         self.speed = speed;
     }
 
@@ -55,8 +55,8 @@ impl Motor {
                 self.do_step(step as u8, delay);
             }
         } else if steps < 0 {
-            for step in steps + 1..1 {
-                self.do_step(step.abs() as u8, delay);
+            for step in (0..steps.abs()).rev() {
+                self.do_step(step as u8, delay);
             }
         }
     }

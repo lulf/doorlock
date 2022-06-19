@@ -2,48 +2,33 @@ use embassy::channel::DynamicReceiver;
 
 use crate::motor::Motor;
 
-#[derive(PartialEq)]
-pub enum State {
-    Locked,
-    Unlocked,
-}
-
 pub struct Lock {
     motor: Motor,
-    state: State,
     steps: u8,
 }
 
 impl Lock {
     pub fn new(motor: Motor) -> Self {
-        Self {
-            motor,
-            state: State::Unlocked,
-            steps: 10,
-        }
+        Self { motor, steps: 100 }
     }
 
     fn lock(&mut self) {
-        if self.state == State::Unlocked {
-            self.motor.enable();
-            self.motor.step(self.steps as i8);
-            self.motor.disable();
-        }
+        self.motor.enable();
+        self.motor.step(self.steps as i8);
+        self.motor.disable();
     }
 
     fn unlock(&mut self) {
-        if self.state == State::Locked {
-            self.motor.enable();
-            self.motor.step(self.steps as i8 * -1);
-            self.motor.disable();
-        }
+        self.motor.enable();
+        self.motor.step(self.steps as i8 * -1);
+        self.motor.disable();
     }
 
     fn set_steps(&mut self, steps: u8) {
         self.steps = steps % 127;
     }
-    
-    fn set_speed(&mut self, speed: u8) {
+
+    fn set_speed(&mut self, speed: u32) {
         self.motor.set_speed(speed);
     }
 }
@@ -51,7 +36,7 @@ impl Lock {
 pub enum LockCommand {
     Lock,
     Unlock,
-    SetSpeed(u8),
+    SetSpeed(u32),
     SetSteps(u8),
 }
 
