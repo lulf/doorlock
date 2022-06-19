@@ -4,10 +4,11 @@
 #![feature(generic_associated_types)]
 #![feature(type_alias_impl_trait)]
 
+mod lock;
 mod motor;
+
 use drogue_device::bsp::boards::nrf52::adafruit_feather_nrf52840::*;
-use drogue_device::drivers::ble::gatt::dfu::FirmwareGattService;
-use drogue_device::drivers::ble::gatt::dfu::{FirmwareService, FirmwareServiceEvent};
+use drogue_device::drivers::ble::gatt::dfu::{FirmwareGattService, FirmwareService, FirmwareServiceEvent};
 use drogue_device::firmware::FirmwareManager;
 use drogue_device::Board;
 use embassy::blocking_mutex::raw::ThreadModeRawMutex;
@@ -15,26 +16,20 @@ use embassy::channel::{Channel, DynamicReceiver, DynamicSender};
 use embassy::executor::Spawner;
 use embassy::time::{Duration, Timer};
 use embassy::util::Forever;
+use embassy_boot_nrf::FirmwareUpdater;
 use embassy_nrf::config::Config;
 use embassy_nrf::gpio::{Level, Output, OutputDrive, Pin};
 use embassy_nrf::interrupt::Priority;
-use embassy_nrf::pwm::SimplePwm;
 use embassy_nrf::Peripherals;
 use heapless::Vec;
-use nrf_softdevice::ble::gatt_server;
-use nrf_softdevice::{
-    ble::{self, peripheral, Connection},
-    raw, Flash, Softdevice,
-};
-
+use lock::*;
 use motor::*;
-
-#[cfg(feature = "panic-probe")]
-use panic_probe as _;
-
+use nrf_softdevice::ble::{self, gatt_server, peripheral, Connection};
+use nrf_softdevice::{raw, Flash, Softdevice};
 #[cfg(feature = "nrf-softdevice-defmt-rtt")]
 use nrf_softdevice_defmt_rtt as _;
-
+#[cfg(feature = "panic-probe")]
+use panic_probe as _;
 #[cfg(feature = "panic-reset")]
 use panic_reset as _;
 
@@ -66,53 +61,57 @@ async fn main(s: Spawner, p: Peripherals) {
     s.spawn(watchdog_task()).unwrap();
 
     // Create a BLE GATT server and make it static
-    //static GATT: Forever<GattServer> = Forever::new();
-    //let server = GATT.put(gatt_server::register(sd).unwrap());
+    static GATT: Forever<GattServer> = Forever::new();
+    let server = GATT.put(gatt_server::register(sd).unwrap());
 
     //// Fiwmare update service event channel and task
-    //static EVENTS: Channel<ThreadModeRawMutex, FirmwareServiceEvent, 10> = Channel::new();
-    //let dfu = FirmwareManager::new(Flash::take(sd), updater::new());
-    //let updater = FirmwareGattService::new(&server.firmware, dfu, version.as_bytes(), 32).unwrap();
-    //s.spawn(updater_task(updater, EVENTS.receiver().into()))
-    //    .unwrap();
+    static EVENTS: Channel<ThreadModeRawMutex, FirmwareServiceEvent, 10> = Channel::new();
+    let dfu = FirmwareManager::new(Flash::take(sd), FirmwareUpdater::default(), version.as_bytes());
+    let updater = FirmwareGattService::new(&server.firmware, dfu, version.as_bytes(), 32).unwrap();
+    s.spawn(updater_task(updater, EVENTS.receiver().into())).unwrap();
 
-    // MOTOR control
-    static COMMANDS: Channel<ThreadModeRawMutex, MotorCommand, 4> = Channel::new();
+    // Lock control
+    static COMMANDS: Channel<ThreadModeRawMutex, LockCommand, 4> = Channel::new();
 
     let ain1 = Output::new(board.a0.degrade(), Level::Low, OutputDrive::Standard);
     let ain2 = Output::new(board.a1.degrade(), Level::Low, OutputDrive::Standard);
     let bin1 = Output::new(board.a2.degrade(), Level::Low, OutputDrive::Standard);
     let bin2 = Output::new(board.a3.degrade(), Level::Low, OutputDrive::Standard);
     let stdby = Output::new(board.d5.degrade(), Level::Low, OutputDrive::Standard);
-    //   let pwm = SimplePwm::new_2ch(board.pwm0, board.a1.degrade(), board.a3.degrade());
     let m = Motor::new(ain1, ain2, bin1, bin2, stdby);
 
-    s.spawn(motor_task(m, COMMANDS.receiver().into())).unwrap();
+    let lock = Lock::new(m);
+
+    s.spawn(lock_task(lock, COMMANDS.receiver().into())).unwrap();
 
     // Starts the bluetooth advertisement and GATT server
-    /*  s.spawn(advertiser_task(
+    s.spawn(advertiser_task(
         s,
         sd,
         server,
         EVENTS.sender().into(),
         COMMANDS.sender().into(),
-        "trainbot",
+        "doorlock",
     ))
-    .unwrap();*/
-
-    COMMANDS.send(MotorCommand::Forward(Speed::_3)).await;
+    .unwrap();
 }
 
 #[nrf_softdevice::gatt_server]
 pub struct GattServer {
     pub firmware: FirmwareService,
-    pub motor: MotorService,
+    pub lock: LockService,
 }
 
 #[nrf_softdevice::gatt_service(uuid = "00002000-b0cd-11ec-871f-d45ddf138840")]
-pub struct MotorService {
+pub struct LockService {
     #[characteristic(uuid = "00002001-b0cd-11ec-871f-d45ddf138840", write, read)]
-    control: i8,
+    locked: bool,
+
+    #[characteristic(uuid = "00002002-b0cd-11ec-871f-d45ddf138840", write, read)]
+    speed: u8,
+
+    #[characteristic(uuid = "00002003-b0cd-11ec-871f-d45ddf138840", write, read)]
+    steps: u8,
 }
 
 #[embassy::task]
@@ -133,12 +132,21 @@ pub async fn gatt_server_task(
     conn: Connection,
     server: &'static GattServer,
     dfu: DynamicSender<'static, FirmwareServiceEvent>,
-    motor: DynamicSender<'static, MotorCommand>,
+    lock: DynamicSender<'static, LockCommand>,
 ) {
     let res = gatt_server::run(&conn, server, |e| match e {
-        GattServerEvent::Motor(MotorServiceEvent::ControlWrite(value)) => {
-            let command: MotorCommand = MotorCommand::new(value);
-            let _ = motor.try_send(command);
+        GattServerEvent::Lock(LockServiceEvent::LockedWrite(do_lock)) => {
+            if do_lock {
+                let _ = lock.try_send(LockCommand::Lock);
+            } else {
+                let _ = lock.try_send(LockCommand::Unlock);
+            }
+        }
+        GattServerEvent::Lock(LockServiceEvent::SpeedWrite(speed)) => {
+            let _ = lock.try_send(LockCommand::SetSpeed(speed));
+        }
+        GattServerEvent::Lock(LockServiceEvent::StepsWrite(steps)) => {
+            let _ = lock.try_send(LockCommand::SetSteps(steps));
         }
         GattServerEvent::Firmware(e) => {
             let _ = dfu.try_send(e);
@@ -156,7 +164,7 @@ pub async fn advertiser_task(
     sd: &'static Softdevice,
     server: &'static GattServer,
     events: DynamicSender<'static, FirmwareServiceEvent>,
-    commands: DynamicSender<'static, MotorCommand>,
+    commands: DynamicSender<'static, LockCommand>,
     name: &'static str,
 ) {
     let mut adv_data: Vec<u8, 31> = Vec::new();
@@ -180,20 +188,13 @@ pub async fn advertiser_task(
             scan_data,
         };
         defmt::debug!("Advertising");
-        let conn = peripheral::advertise_connectable(sd, adv, &config)
-            .await
-            .unwrap();
+        let conn = peripheral::advertise_connectable(sd, adv, &config).await.unwrap();
 
         defmt::debug!("connection established");
-        if let Err(e) = spawner.spawn(gatt_server_task(
-            conn,
-            server,
-            events.clone(),
-            commands.clone(),
-        )) {
+        if let Err(e) = spawner.spawn(gatt_server_task(conn, server, events.clone(), commands.clone())) {
             defmt::warn!("Error spawning gatt task: {:?}", e);
         }
-        commands.send(MotorCommand::Stop).await;
+        commands.send(LockCommand::Lock).await;
     }
 }
 
@@ -225,9 +226,7 @@ pub fn enable_softdevice(name: &'static str) -> &'static Softdevice {
             event_length: 24,
         }),
         conn_gatt: Some(raw::ble_gatt_conn_cfg_t { att_mtu: 128 }),
-        gatts_attr_tab_size: Some(raw::ble_gatts_cfg_attr_tab_size_t {
-            attr_tab_size: 32768,
-        }),
+        gatts_attr_tab_size: Some(raw::ble_gatts_cfg_attr_tab_size_t { attr_tab_size: 32768 }),
         gap_role_count: Some(raw::ble_gap_cfg_role_count_t {
             adv_set_count: 1,
             periph_role_count: 3,
@@ -240,9 +239,7 @@ pub fn enable_softdevice(name: &'static str) -> &'static Softdevice {
             current_len: name.len() as u16,
             max_len: name.len() as u16,
             write_perm: unsafe { core::mem::zeroed() },
-            _bitfield_1: raw::ble_gap_cfg_device_name_t::new_bitfield_1(
-                raw::BLE_GATTS_VLOC_STACK as u8,
-            ),
+            _bitfield_1: raw::ble_gap_cfg_device_name_t::new_bitfield_1(raw::BLE_GATTS_VLOC_STACK as u8),
         }),
         ..Default::default()
     };

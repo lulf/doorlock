@@ -2,10 +2,10 @@
 authors = [
     "Ulf Lilleengen <lulf@redhat.com>",
 ]
-edition = "2018"
-name = "trainbot-application"
+edition = "2021"
+name = "doorlock"
 version = "0.1.0"
-description = "Trainbot"
+description = "Doorlock"
 keywords = ["nrf52840", "nrf", "nrf52", "dfu", "bootloader", "ble"]
 resolver = "2"
 
