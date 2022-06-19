@@ -102,6 +102,14 @@ async fn main(s: Spawner, p: Peripherals) {
         "doorlock",
     ))
     .unwrap();
+    /*
+        loop {
+            COMMANDS.send(LockCommand::Lock).await;
+            Timer::after(Duration::from_secs(2)).await;
+            COMMANDS.send(LockCommand::Unlock).await;
+            Timer::after(Duration::from_secs(2)).await;
+        }
+    */
 }
 
 #[nrf_softdevice::gatt_server]
