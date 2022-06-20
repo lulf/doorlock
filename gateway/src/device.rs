@@ -28,7 +28,7 @@ impl LockDevice {
     }
 
     pub async fn unlock(&mut self) -> anyhow::Result<()> {
-        self.write_char(LOCK_SERVICE_UUID, LOCK_CHAR_UUID, &[1]).await
+        self.write_char(LOCK_SERVICE_UUID, LOCK_CHAR_UUID, &[0]).await
     }
 
     pub async fn set_speed(&mut self, speed: u32) -> anyhow::Result<()> {

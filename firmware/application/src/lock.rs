@@ -9,7 +9,7 @@ pub struct Lock {
 
 impl Lock {
     pub fn new(motor: Motor) -> Self {
-        Self { motor, steps: 4000 }
+        Self { motor, steps: 2900 }
     }
 
     fn lock(&mut self) {
