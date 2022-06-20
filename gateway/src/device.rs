@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use btleplug::api::{BDAddr, Central, Characteristic, Peripheral as _, WriteType};
 use btleplug::platform::{Adapter, Peripheral};
 use tokio::time::{sleep, Duration};
@@ -27,6 +28,11 @@ impl LockDevice {
         self.write_char(LOCK_SERVICE_UUID, LOCK_CHAR_UUID, &[1]).await
     }
 
+    pub async fn is_locked(&mut self) -> anyhow::Result<bool> {
+        let data = self.read_char(LOCK_SERVICE_UUID, LOCK_CHAR_UUID).await?;
+        Ok(if data.len() > 0 { data[0] == 1 } else { false })
+    }
+
     pub async fn unlock(&mut self) -> anyhow::Result<()> {
         self.write_char(LOCK_SERVICE_UUID, LOCK_CHAR_UUID, &[0]).await
     }
@@ -41,7 +47,6 @@ impl LockDevice {
         self.write_char(LOCK_SERVICE_UUID, STEP_CHAR_UUID, &data[..]).await
     }
 
-    #[allow(dead_code)]
     async fn read_char(&mut self, service: uuid::Uuid, c: uuid::Uuid) -> anyhow::Result<Vec<u8>> {
         let (device, c) = self.find_char(service, c).await?;
         if let Some(c) = c {

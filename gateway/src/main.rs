@@ -1,6 +1,10 @@
-use clap::{Parser, Subcommand};
+use clap::Parser;
 mod device;
 use device::*;
+mod gateway;
+use gateway::*;
+
+use std::time::Duration;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -17,22 +21,17 @@ struct Args {
     device: String,
 
     /// The command to issue
-    #[clap(subcommand)]
-    command: Command,
-}
+    #[clap(long)]
+    drogue_http: String,
 
-#[derive(Debug, Subcommand, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Command {
-    SetStep {
-        #[clap(long)]
-        step: u16,
-    },
-    SetSpeed {
-        #[clap(long)]
-        speed: u32,
-    },
-    Lock,
-    Unlock,
+    #[clap(long)]
+    user: String,
+
+    #[clap(long)]
+    password: String,
+
+    #[clap(long, parse(try_from_str=humantime::parse_duration))]
+    interval: Option<Duration>,
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -54,13 +53,35 @@ async fn main() -> anyhow::Result<()> {
         central.start_scan(ScanFilter::default()).await?;
     }
 
-    let mut s = LockDevice::new(&args.device, central);
+    let interval = args.interval.unwrap_or(Duration::from_secs(30));
 
-    match args.command {
-        Command::SetStep { step } => s.set_step(step).await?,
-        Command::SetSpeed { speed } => s.set_speed(speed).await?,
-        Command::Lock => s.lock().await?,
-        Command::Unlock => s.unlock().await?,
+    let gateway = Gateway::new(args.drogue_http.clone(), args.user.clone(), args.password.clone());
+    let mut lock = LockDevice::new(&args.device, central);
+
+    loop {
+        if let Ok(is_locked) = lock.is_locked().await {
+            log::info!("Reporting lock state. Is locked: {}", is_locked);
+            match gateway
+                .publish(&args.device, &Request { locked: is_locked }, interval)
+                .await
+            {
+                Ok(Some(response)) => match response.command {
+                    Command::Lock => {
+                        let _ = lock.lock().await;
+                    }
+                    Command::Unlock => {
+                        let _ = lock.unlock().await;
+                    }
+                },
+                Ok(None) => {
+                    log::info!("No command received");
+                }
+                Err(e) => {
+                    log::warn!("Error reporting lock state: {:?}", e);
+                }
+            }
+        } else {
+            tokio::time::sleep(interval).await;
+        }
     }
-    Ok(())
 }
