@@ -1,8 +1,7 @@
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 use clap::Parser;
-use std::path::PathBuf;
+use std::sync::{atomic::AtomicBool, Arc};
 
-use drogue_client::openid::AccessTokenProvider;
 use paho_mqtt as mqtt;
 
 use std::time::Duration;
@@ -24,9 +23,13 @@ struct Args {
     #[clap(long)]
     device_registry: String,
 
-    /// Name of specific application to manage firmware updates for (will use all accessible from service account by default)
+    /// Name of specific application to manage
     #[clap(long)]
     application: String,
+
+    /// Name of specific device to manage
+    #[clap(long)]
+    device: String,
 
     /// Token for authenticating ajour to Drogue IoT
     #[clap(long)]
@@ -67,15 +70,6 @@ async fn main() -> anyhow::Result<()> {
         .persistence(mqtt::PersistenceType::None)
         .finalize();
     let mut mqtt_client = mqtt::AsyncClient::new(mqtt_opts)?;
-
-    let tp = AccessTokenProvider {
-        user: args.user.to_string(),
-        token: token.to_string(),
-    };
-
-    pub type DrogueClient = drogue_client::registry::v1::Client;
-    let url = reqwest::Url::parse(&args.device_registry)?;
-    let drg = DrogueClient::new(reqwest::Client::new(), url, tp);
 
     let mut conn_opts = mqtt::ConnectOptionsBuilder::new();
     conn_opts.user_name(args.user);
@@ -122,8 +116,15 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Failed to connect to MQTT endpoint")?;
 
-    let mut api = api::ApiServer::new(mqtt_client.clone(), args.application.clone(), args.api_port);
-    let mut app = server::Server::new(mqtt_client, args.mqtt_group_id, args.application);
+    let state = Arc::new(AtomicBool::new(false));
+    let mut api = api::ApiServer::new(
+        mqtt_client.clone(),
+        args.application.clone(),
+        args.device.clone(),
+        args.api_port,
+        state.clone(),
+    );
+    let mut app = server::Server::new(mqtt_client, args.mqtt_group_id, args.application, args.device, state);
 
     futures::try_join!(app.run(), api.run())?;
     Ok(())
