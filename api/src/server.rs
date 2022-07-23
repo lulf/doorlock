@@ -66,7 +66,7 @@ impl Server {
                             }
 
                             let status: Option<Result<Request, anyhow::Error>> = if let Some(Data::Json(v)) = e.data() {
-                                Some(serde_json::from_str(v.as_str().unwrap()).map_err(|e| e.into()))
+                                Some(serde_json::from_value(v.clone()).map_err(|e| e.into()))
                             } else {
                                 None
                             };
