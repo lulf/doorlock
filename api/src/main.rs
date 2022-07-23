@@ -19,10 +19,6 @@ struct Args {
     #[clap(long)]
     mqtt_group_id: Option<String>,
 
-    /// Device registry URL
-    #[clap(long)]
-    device_registry: String,
-
     /// Name of specific application to manage
     #[clap(long)]
     application: String,
