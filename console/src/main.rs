@@ -57,8 +57,10 @@ fn doorlock() -> Html {
         })
     };
 
+    let state_desc = if state.locked { "Unlock" } else { "Lock" };
+
     html! {
-        <button type="button" onclick={on_lock_toggle.clone()}>{"Lock"}</button>
+        <button type="button" onclick={on_lock_toggle.clone()}>{state_desc}</button>
     }
 }
 
