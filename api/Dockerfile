@@ -12,5 +12,6 @@ LABEL org.opencontainers.image.source="https://github.com/lulf/doorlock"
 
 COPY --from=builder /build/target/release/doorlock-api /
 COPY --from=builder /build/run.sh /
+COPY --from=builder /build/templates /
 
 ENTRYPOINT [ "/run.sh" ]
