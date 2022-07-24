@@ -23,3 +23,5 @@ cloudevents-sdk = "0.5"
 reqwest = {version = "0.11", default-features = false, features = ["json", "stream", "native-tls"]}
 async-trait = "0.1"
 chrono = "0.4"
+tera = "1"
+lazy_static = "1"
